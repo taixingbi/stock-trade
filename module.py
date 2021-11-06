@@ -86,11 +86,11 @@ def find_triger_price(peak_price, rate_init_raise = 1, rate_peak_drop = 1, init_
     stop_price = max( a, b)
     return round(stop_price, 2)
 
-
-def ipo_order(order_sequence, name, share, peak_price, rate_init_raise , rate_peak_drop, init_pirce):
+def ipo_order(order_sequence, name, share, peak_price, rate_init_raise, rate_peak_drop, init_pirce):
     stop_price = find_triger_price(peak_price, rate_init_raise, rate_peak_drop, init_pirce)
-    valid_stock_have_shares, shares = stock_have_shares(name)
+    valid_stock_have_shares, share_hold = stock_have_shares(name)
 
+    # share = max(share, share_hold)
     #buy
     if order_sequence[0] == "buy" and valid_stock_have_shares == False: 
         stock_buy_stop(name, share, stop_price)
