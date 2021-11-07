@@ -1,5 +1,5 @@
 from datetime import datetime
-import time
+from pytz import timezone
 
 from yahoo_fin import stock_info as si
 import cryptocompare
@@ -45,7 +45,7 @@ def check_my_stocks(name):
 
     return None
 
-def stock_have_shares(name):
+def stock_have_share(name):
     stock = check_my_stocks(name)
     if stock: 
         shares_float = float(stock['quantity']) 
@@ -76,44 +76,71 @@ def stock_buy_stop(name, share, price):
     print(res)
 # stock_buy_stop("QQQ", 1, 500)
 
+def cancel_stock_order(order_id):
+    if order_id:
+        rs.orders.cancel_stock_order(order_id)
 
-#           need to  buy 
-# ------------------------------
-#           need to  sell
+# ----------------------- triger -----------------------
 def find_triger_price(peak_price, rate_init_raise = 1, rate_peak_drop = 1, init_pirce = 0):
     a = init_pirce * (1 + (1.0*rate_init_raise/100))
     b = peak_price * (1 - (1.0*rate_peak_drop/100)) 
     stop_price = max( a, b)
     return round(stop_price, 2)
 
-def ipo_order(order_sequence, name, share, peak_price, rate_init_raise, rate_peak_drop, init_pirce):
-    stop_price = find_triger_price(peak_price, rate_init_raise, rate_peak_drop, init_pirce)
-    valid_stock_have_shares, share_hold = stock_have_shares(name)
+#           need to  buy 
+# ------------------------------
+#           need to  sell
+class TradeIpo:
+    def __init__(self, name):
+        self.name = name
+        self.init_pirce = 20 # $20
+        self.rate_init_raise = 1 # 1%
+        self.rate_peak_drop = 1  # 1%
+        self.live_price = 0
+        self.peak_price = 0
+        self.share = 1
+        self.order_sequence = ["buy", "sell"]
+        self.stoploss_order_id = None
 
-    # share = max(share, share_hold)
-    #buy
-    if order_sequence[0] == "buy" and valid_stock_have_shares == False: 
-        stock_buy_stop(name, share, stop_price)
-        print("bought", name, share, stop_price)
-        order_sequence.reverse()
-    #sell
-    if order_sequence[0] == "sell" and valid_stock_have_shares == True: 
-        stock_sell_stop(name, share, stop_price)
-        print("sold", name, share, stop_price)
-        order_sequence.reverse()
+    def peakPrice(self):
+        peak_price = livePrice(self.name)
+        if self.peak_price < peak_price : 
+            self.peak_price = peak_price
+            return True, self.peak_price # isChange, $30
+        return False, self.peak_price # isChange, $30
 
-    print(order_sequence)
+    def stockSellStop(self):
+        cancel_stock_order(self.stoploss_order_id)
+        res = stock_sell_stop(self.name, self.share, self.stop_price)
+        self.stoploss_order_id = res['id']
 
-# ipo_buy("QQQ", 1, 20, 1000) # triger by $990
+    def process(self):
+        timenow = datetime.now(timezone('US/Eastern')).strftime('%Y-%m-%d %H:%M:%S')
+        # Logger.critical(timenow)
+        print("\n"+timenow)
+        isPeakChange, peak_price = self.peakPrice() 
+
+        stop_price = find_triger_price( peak_price, self.rate_init_raise, self.rate_peak_drop, self.init_pirce)
+        is_stock_have_share, share_hold = stock_have_share(self.name)
+
+        # share = max(share, share_hold)
+        # buy
+        if is_stock_have_share == False and self.order_sequence[0] == "buy" : 
+            stock_buy_stop(self.name, self.share, stop_price)
+            
+            print(self.order_sequence[0], self.name, self.share, stop_price)
+            self.order_sequence.reverse() # ["sell", "buy"]
+            self.stoploss_order_id = None
+
+        # multi sell
+        if is_stock_have_share == True and (self.stoploss_order_id == None or isPeakChange):
+            self.stockSellStop()
+            print(self.order_sequence[0], self.name, self.share, stop_price)
+            if self.order_sequence[0] == "sell":
+                self.order_sequence.reverse() # buy
+
+        print(self.order_sequence)
 
 if __name__ == "__main__":
-
-    order_sequence = ["buy" , "sell"]
-
-    name = "QQQ"
-    share = 1
-    peak_price = 500
-    rate_init_raise, rate_peak_drop = 1, 1
-    init_pirce = 20
-    # order_sequence.reverse()
-    ipo_order(order_sequence, name, share, peak_price, rate_init_raise , rate_peak_drop, init_pirce) 
+    TradeIpo = TradeIpo()
+    TradeIpo.process()
