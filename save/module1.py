@@ -111,24 +111,6 @@ def stockSelltrailingStop(name, share, percentage):
         print("order_sell_trailing_stop failed")
         return False
 
-def stockBuytrailingStop(name, share, percentage):
-    res = rs.orders.order_buy_trailing_stop(   name, 
-                                                share, 
-                                                percentage,
-                                                trailType= 'percentage',
-                                                timeInForce= 'gtc', 
-                                                extendedHours= False,
-                                                jsonify=True)
-    print(res)
-    try:
-        res['id']
-        return True
-    except:
-        print("order_sell_trailing_stop failed")
-        return False
-
-
-
 # triger a market buy order if stock rises to
 def stockBuyStop(name, share, price):
     res= rs.orders.order(   name, 
@@ -148,8 +130,6 @@ def stockBuyStop(name, share, price):
         print("stock_buy_stop failed")
         return False
 
-
-
     # {'detail': 'Only accepting immediate limit orders for this symbol since it has not traded yet.'}
 # stock_buy_stop("QQQ", 1, 500)
 def cancel_stock_order(order_id):
@@ -168,45 +148,41 @@ def find_triger_price(peak_price, rate_init_raise = 1, rate_peak_drop = 1, init_
 # ------------------------------
 #           need to  sell
 class TradeIpo:
-    def __init__(self, NAME, SHARE, LOWEST_PRICE_TRIGER, PERCENGTAGE_BUY_TRAILING_STOP, PERCENGTAGE_SELL_TRAILING_STOP):
+    def __init__(self, NAME, SHARE, INIT_PRICE, INIT_PERCENGTAGE_HIGHER):
         self.NAME = NAME
         self.SHARE = SHARE
         
-        self.LOWEST_PRICE_TRIGER = LOWEST_PRICE_TRIGER
-        self.PERCENGTAGE_BUY_TRAILING_STOP = PERCENGTAGE_BUY_TRAILING_STOP
-        self.PERCENGTAGE_SELL_TRAILING_STOP = PERCENGTAGE_SELL_TRAILING_STOP
+        # for buy
+        self.INIT_PRICE = INIT_PRICE
+        self.INIT_PERCENGTAGE_HIGHER = INIT_PERCENGTAGE_HIGHER 
+        self.PEAK_PERCENGTAGE_LOWER = 1  
+        # for sell
+        self.PERCENGTAGE_TRAILING_STOP = 1
 
         self.order_sequence = ["buy", "sell"]
         # self.order_sequence = ["sell", "buy"]
-        self.CheckPrice=  CheckPrice(self.NAME)
+        self.CheckPrice = CheckPrice(self.NAME)
 
     def process(self):
         timenow = datetime.now(timezone('US/Eastern')).strftime('%Y-%m-%d %H:%M:%S')
         # Logger.critical(timenow)
         print("\n"+timenow)
-
+        stop_price = find_triger_price(self.CheckPrice.peak(), self.INIT_PERCENGTAGE_HIGHER, self.PEAK_PERCENGTAGE_LOWER, self.INIT_PRICE)
         is_stock_have_share, share_hold = stock_have_share(self.NAME)
-        livePrice = self.CheckPrice.live()
-        if livePrice < self.LOWEST_PRICE_TRIGER:
-            print( "live price $" + str(livePrice) + " is lower $" + str(self.LOWEST_PRICE_TRIGER))
-            if is_stock_have_share == True:
-                validOrder = stockSelltrailingStop(self.NAME, self.SHARE, self.PERCENGTAGE_SELL_TRAILING_STOP)
-                self.order_sequence = ["buy", "sell"]
-            return
 
         # share = max(share, share_hold)
         # buy
         if is_stock_have_share == False and self.order_sequence[0] == "buy" : 
-            validOrder = stockBuytrailingStop(self.NAME, self.SHARE, self.PERCENGTAGE_BUY_TRAILING_STOP)
+            validOrder = stockBuyStop(self.NAME, self.SHARE, stop_price)
             if validOrder == False: return
-            print(self.order_sequence[0], self.NAME, self.SHARE, self.PERCENGTAGE_BUY_TRAILING_STOP)
+            print(self.order_sequence[0], self.NAME, self.SHARE, stop_price)
             self.order_sequence.reverse() # ["sell", "buy"]
 
         # sell
         if is_stock_have_share == True and self.order_sequence[0] == "sell":
-            validOrder = stockSelltrailingStop(self.NAME, self.SHARE, self.PERCENGTAGE_SELL_TRAILING_STOP)
+            validOrder = stockSelltrailingStop(self.NAME, self.SHARE, self.PERCENGTAGE_TRAILING_STOP)
             if validOrder == False: return
-            print(self.order_sequence[0], self.NAME, self.SHARE, self.PERCENGTAGE_SELL_TRAILING_STOP)
+            print(self.order_sequence[0], self.NAME, self.SHARE, self.PERCENGTAGE_TRAILING_STOP)
             self.order_sequence.reverse() # buy
 
         print(self.order_sequence)
@@ -270,3 +246,4 @@ if __name__ == "__main__":
     # print( CheckPrice.live() )
 
     stockSelltrailingStop("QQQ", 1,  1)
+    
