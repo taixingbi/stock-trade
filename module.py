@@ -24,6 +24,11 @@ def login():
 
 rs = login()
 
+# get time
+def getTimeNow():
+    timenow = datetime.now(timezone('US/Eastern')).strftime('%Y-%m-%d %H:%M:%S')
+    return timenow
+
 # ----------------------- check real time price peak price -----------------------
 class CheckPrice:
     def __init__(self, name):
@@ -70,6 +75,7 @@ def check_my_stocks(name):
 
 def stock_have_share(name):
     stock = check_my_stocks(name)
+    print(stock)
     if stock: 
         shares_float = float(stock['quantity']) 
         return shares_float > 1, int(shares_float) 
@@ -96,14 +102,19 @@ def stock_sell(name, share):
     print(res)
 
 def stockSelltrailingStop(name, share, percentage):
-    res = rs.orders.order_sell_trailing_stop(   name, 
-                                                share, 
-                                                percentage,
-                                                trailType= 'percentage',
-                                                timeInForce= 'gtc', 
-                                                extendedHours= False,
-                                                jsonify=True)
-    print(res)
+    try:
+        res = rs.orders.order_sell_trailing_stop(   name, 
+                                                    share, 
+                                                    percentage,
+                                                    trailType= 'percentage',
+                                                    timeInForce= 'gtc', 
+                                                    extendedHours= False,
+                                                    jsonify=True)
+        print(res)
+    except: 
+        print("order_sell_trailing_stop ", name, "does not exist")
+        return False  
+
     try:
         res['id']
         return True
@@ -112,14 +123,19 @@ def stockSelltrailingStop(name, share, percentage):
         return False
 
 def stockBuytrailingStop(name, share, percentage):
-    res = rs.orders.order_buy_trailing_stop(   name, 
-                                                share, 
-                                                percentage,
-                                                trailType= 'percentage',
-                                                timeInForce= 'gtc', 
-                                                extendedHours= False,
-                                                jsonify=True)
-    print(res)
+    try:
+        res = rs.orders.order_buy_trailing_stop(    name, 
+                                                    share, 
+                                                    percentage,
+                                                    trailType= 'percentage',
+                                                    timeInForce= 'gtc', 
+                                                    extendedHours= False,
+                                                    jsonify=True)
+        print(res)
+    except:
+        print("order_sell_trailing_stop ", name, "does not exist")
+        return False  
+
     try:
         res['id']
         return True
@@ -168,7 +184,7 @@ def find_triger_price(peak_price, rate_init_raise = 1, rate_peak_drop = 1, init_
 # ------------------------------
 #           need to  sell
 class TradeIpo:
-    def __init__(self, NAME, SHARE, LOWEST_PRICE_TRIGER, PERCENGTAGE_BUY_TRAILING_STOP, PERCENGTAGE_SELL_TRAILING_STOP):
+    def __init__(self, NAME, SIDE, SHARE, LOWEST_PRICE_TRIGER, PERCENGTAGE_BUY_TRAILING_STOP, PERCENGTAGE_SELL_TRAILING_STOP):
         self.NAME = NAME
         self.SHARE = SHARE
         
@@ -176,7 +192,7 @@ class TradeIpo:
         self.PERCENGTAGE_BUY_TRAILING_STOP = PERCENGTAGE_BUY_TRAILING_STOP
         self.PERCENGTAGE_SELL_TRAILING_STOP = PERCENGTAGE_SELL_TRAILING_STOP
 
-        self.order_sequence = ["buy", "sell"]
+        self.order_sequence = ["buy", "sell"] if SIDE=="BUY" else ["sell", "buy"]
         # self.order_sequence = ["sell", "buy"]
         self.CheckPrice=  CheckPrice(self.NAME)
 
@@ -186,13 +202,15 @@ class TradeIpo:
         print("\n"+timenow)
 
         is_stock_have_share, share_hold = stock_have_share(self.NAME)
-        livePrice = self.CheckPrice.live()
-        if livePrice < self.LOWEST_PRICE_TRIGER:
-            print( "live price $" + str(livePrice) + " is lower $" + str(self.LOWEST_PRICE_TRIGER))
-            if is_stock_have_share == True:
-                validOrder = stockSelltrailingStop(self.NAME, self.SHARE, self.PERCENGTAGE_SELL_TRAILING_STOP)
-                self.order_sequence = ["buy", "sell"]
-            return
+        print(self.NAME + " share: " + str(share_hold))
+        # livePrice = self.CheckPrice.live()
+        # print(livePrice, self.LOWEST_PRICE_TRIGER)
+        # if livePrice < self.LOWEST_PRICE_TRIGER:
+        #     print( "live price $" + str(livePrice) + " is lower $" + str(self.LOWEST_PRICE_TRIGER))
+        #     if is_stock_have_share == True:
+        #         validOrder = stockSelltrailingStop(self.NAME, self.SHARE, self.PERCENGTAGE_SELL_TRAILING_STOP)
+        #         self.order_sequence = ["buy", "sell"]
+        #     return
 
         # share = max(share, share_hold)
         # buy
